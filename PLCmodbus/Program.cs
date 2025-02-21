@@ -35,6 +35,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.IO.Ports;
 
 // NModbus4 패키지
 using NModbus;
@@ -60,6 +61,8 @@ namespace VirtualPLC
         // [3] Painting(도장 공정) 센서 변수
         private double paintPressure;  // 페인트 압력(bar)
         private double paintFlow;      // 페인트 유량(mL/min)
+
+        static string TestMessage;
 
         private TcpClient client;
         private IModbusMaster master;  // NModbus4의 Modbus Master
@@ -180,6 +183,7 @@ namespace VirtualPLC
             Console.WriteLine("=== Painting (도장 공정) ===");
             Console.WriteLine($"PaintPressure : {paintPressure:F2} bar");
             Console.WriteLine($"PaintFlow     : {paintFlow:F2} mL/min");
+            Console.WriteLine($"TestMessage   : {TestMessage}");
             Console.WriteLine("=================================\n");
         }
 
@@ -264,7 +268,7 @@ namespace VirtualPLC
         {
             File.AppendAllText("error.log", $"{DateTime.Now}: {message}\n");
         }
-
+        static SerialPort serialPort;
         static void Main(string[] args)
         {
             var plc = new VirtualPLC();
@@ -274,12 +278,21 @@ namespace VirtualPLC
             int serverPort = 502;       // Modbus TCP 기본 포트는 502
             byte slaveId = 1;          // PLC에서 설정한 Slave ID
 
+            serialPort = new SerialPort("COM5", 9600);
+            serialPort.DataReceived += SerialPort_DataReceived;
+
+            serialPort.Open();
             // 1) Modbus TCP 연결
             plc.ConnectToServer(serverIp, serverPort, slaveId);
 
             // 2) 쓰기 쓰레드 시작
             Thread sendDataThread = new Thread(() => plc.SendData(slaveId, 0));
             sendDataThread.Start();
+        }
+        private static void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        {
+            string data = serialPort.ReadLine(); // 아두이노에서 한 줄 읽기
+            TestMessage = data;
         }
     }
 }
